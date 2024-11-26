@@ -37,8 +37,8 @@ funding_sources = ["Government", "Private Sector"]
 # Пример с константами
 input_text_with_constants = """
 def pi = 3.14159
-radius = 10
-area = pi * radius * radius
+def radius = 10
+def area = pi * radius * radius
 """
 
 def run_tests():
@@ -71,18 +71,19 @@ controls => [
     print("Тест 2: Конфигурация для ученого")
     toml_data = translator.parse_toml(toml_data_research)
     result = translator.translate(toml_data)
-    expected_output_research = """research => [
+    # Это просто три словаря
+    expected_output_research = """research => [ 
     project_name => 'Quantum Computing',
     budget => 5000000,
     deadline => '2025-12-31'
 ]
 team => [
     lead => 'Dr. Smith',
-    members => { 'Alice'. 'Bob'. 'Charlie' }
+    members => { 'Alice', 'Bob', 'Charlie' }
 ]
 resources => [
     computing_power => 1000,
-    funding_sources => { 'Government'. 'Private Sector' }
+    funding_sources => { 'Government', 'Private Sector' }
 ]"""
     test2_success = result == expected_output_research
     print("Ожидаемый результат:\n", expected_output_research)
