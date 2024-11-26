@@ -21,7 +21,7 @@ class Translator:
         elif isinstance(value, str):
             return f"'{value}'"
         elif isinstance(value, list):
-            return '{ ' + '. '.join(self.translate_value(item) for item in value) + ' }'
+            return '{ ' + ', '.join(self.translate_value(item) for item in value) + ' }'  # Исправлено
         elif isinstance(value, dict):
             return '[\n' + ',\n'.join(f"    {k} => {self.translate_value(v)}" for k, v in value.items()) + '\n]'
         else:
