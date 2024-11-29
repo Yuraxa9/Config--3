@@ -1,67 +1,62 @@
 import toml
 import sys
-import re
 
-class Translator:
-    def __init__(self):
-        self.constants = {}  # Хранилище для констант
-    
-    def parse_toml(self, input_text):
-        try:
-            return toml.loads(input_text)
-        except toml.TomlDecodeError as e:
-            sys.stderr.write(f"Ошибка разбора TOML: {str(e)}\n")
-            sys.exit(1)
+# Хранилище констант
+constants = {}
 
-    def translate_value(self, value):
-        if isinstance(value, bool):
-            return "true" if value else "false"
-        elif isinstance(value, int) or isinstance(value, float):
-            return str(value)
-        elif isinstance(value, str):
-            return f"'{value}'"
-        elif isinstance(value, list):
-            return '{ ' + ', '.join(self.translate_value(item) for item in value) + ' }'  # Исправлено
-        elif isinstance(value, dict):
-            return '[\n' + ',\n'.join(f"    {k} => {self.translate_value(v)}" for k, v in value.items()) + '\n]'
-        else:
-            raise ValueError("Неизвестный тип данных")
+def parse_input():
+    """Читает и парсит TOML из стандартного ввода."""
+    try:
+        return toml.loads(sys.stdin.read())
+    except toml.TomlDecodeError as e:
+        sys.exit(f"Ошибка синтаксиса TOML: {e}")
 
-    def translate_constants(self, input_text):
-        pattern = r'def\s+([a-z][a-z0-9_]*)\s*=\s*(.+)'
-        matches = re.finditer(pattern, input_text)
-        for match in matches:
-            name, value = match.groups()
-            self.constants[name] = value.strip()  # Убираем лишние пробелы вокруг значений
-
-    def replace_constants(self, text):
-        pattern = r'!\s*\((\w+)\)'  # Регулярное выражение для поиска констант
-        while re.search(pattern, text):
-            text = re.sub(pattern, lambda m: self.constants.get(m.group(1), 'undefined'), text)
-        return text
-
-    def translate(self, toml_data):
-        output_lines = []
-        for key, value in toml_data.items():
-            if isinstance(value, dict):
-                output_lines.append(f"{key} => {self.translate_value(value)}")
+def process_constants(data):
+    """Рекурсивно обрабатывает объявления и вычисления констант."""
+    if isinstance(data, dict):
+        for key, value in list(data.items()):
+            # Объявление константы (удаляем префикс "def ")
+            if key.startswith("def "):
+                name = key.split(" ", 1)[1]  # Убираем префикс "def "
+                constants[name] = process_constants(value)
+                del data[key]  # Удаляем определение константы из данных
+            # Замена вычисляемой константы
+            elif isinstance(value, str) and value.startswith("!(") and value.endswith(")") :
+                const_name = value[2:-1]
+                data[key] = constants.get(const_name, f"Ошибка: не найдена константа '{const_name}'")
             else:
-                output_lines.append(f"{key} => {self.translate_value(value)}")
-        return '\n'.join(output_lines)
+                data[key] = process_constants(value)
+    elif isinstance(data, list):
+        for i in range(len(data)):
+            if isinstance(data[i], str) and data[i].startswith("!(") and data[i].endswith(")") :
+                const_name = data[i][2:-1]
+                data[i] = constants.get(const_name, f"Ошибка: не найдена константа '{const_name}'")
+            else:
+                data[i] = process_constants(data[i])
+    return data
 
-
-def main():
-    input_text = sys.stdin.read()
-    translator = Translator()
-    
-    # Обработка констант
-    translator.translate_constants(input_text)
-    input_text = translator.replace_constants(input_text)
-    
-    toml_data = translator.parse_toml(input_text)
-    translated_text = translator.translate(toml_data)
-    
-    sys.stdout.write(translated_text + '\n')
+def generate_output(data, indent=0):
+    """Генерирует текст на учебном конфигурационном языке с учетом отступов."""
+    spacer = " " * (indent * 4)
+    if isinstance(data, dict):
+        items = ",\n".join(f"{spacer}    {key} => {generate_output(value, indent + 1)}" for key, value in data.items())
+        return "[\n" + items + f"\n{spacer}]"
+    elif isinstance(data, list):
+        items = ". ".join(generate_output(value, indent) for value in data)
+        return "{ " + items + " }"
+    elif isinstance(data, str):
+        return f"'{data}'"
+    elif isinstance(data, (int, float)):
+        return str(data)
+    else:
+        raise TypeError(f"Неизвестный тип данных: {type(data)}")
 
 if __name__ == "__main__":
-    main()
+    input_data = parse_input()
+    processed_data = process_constants(input_data)
+    output = generate_output(processed_data)
+    
+    # Печать констант в правильном формате
+    for name, value in constants.items():
+        print(f"def {name} = {value}")
+    print(output)
