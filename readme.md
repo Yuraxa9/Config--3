@@ -92,3 +92,4 @@ translate(toml_data)
 ```makefile
     area = 3.14159 * radius * radius
 ```
+![Скриншот результата](photo/image.png)

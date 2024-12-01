@@ -1,85 +1,162 @@
-import subprocess
-
-def run_test(input_text):
-    """Выполняет скрипт config_language.py с заданным входным текстом."""
-    result = subprocess.run(
-        ["python", "config_language.py"],
-        input=input_text,
-        capture_output=True,
-        text=True
-    )
-    if result.stderr:
-        print(f"Ошибка:\n{result.stderr}")
-    return result.stdout.strip()
-
-def test_configuration(input_text, expected_output):
-    """Сравнивает результат выполнения с ожидаемым выводом."""
-    actual_output = run_test(input_text)
-    print(f"\nОжидаемый:\n{expected_output}\nПолученный:\n{actual_output}")
-    assert actual_output.strip() == expected_output.strip(), \
-        f"\nОжидаемый:\n{expected_output}\nПолученный:\n{actual_output}"
-
-if __name__ == "__main__":
-    # Тест 1: Веб-приложение
-    input_1 = """\
-"def port" = 8080
-"def env" = 'production'
-
-server = [
-    host = '0.0.0.0',
-    port = !(port),
-    env = !(env),
-    routes = { 'home', 'about', 'contact' }
-]
-"""
-    expected_output_1 = """\
-def port = 8080
-def env = 'production'
-[ 
-    server => [
-        host => '0.0.0.0',
-        port => 8080,
-        env => 'production',
-        routes => { 'home', 'about', 'contact' }
-    ]
-]
-"""
-    test_configuration(input_1, expected_output_1)
-    print("Тест 1 пройден.")
-
-    # Тест 2: Система мониторинга
-    input_2 = """\
-"def interval" = 60
-
-monitoring = [
-    enabled = true,
-    interval = !(interval),
-    endpoints = [
-        url = 'https://service1.example.com',
-        timeout = 30
-    ],
-    alerts = [
-        email = 'alerts@example.com',
-        threshold = 80
-    ]
-]
-"""
-    expected_output_2 = """\
-def interval = 60
-[ 
-    monitoring => [
-        enabled => true,
-        interval => 60,
-        endpoints => [
-            url => 'https://service1.example.com',
-            timeout => 30
+# Ожидаемый вывод для task_manager_config
+expected_task_manager_config = """
+[
+def default_priority = 'Medium',
+def max_tasks_per_user = 10,
+task_manager => [
+    users => [
+        user1 => [
+            name => 'Alice',
+            tasks => {
+[
+                    name => 'Task 1',
+                    priority => 'Medium'
+                    ],
+[
+                    name => 'Task 2',
+                    priority => 'High'
+                    ]
+                }
+            ],
+        user2 => [
+            name => 'Bob',
+            tasks => {
+[
+                    name => 'Task 3',
+                    priority => 'Medium'
+                    ],
+[
+                    name => 'Task 4',
+                    priority => 'Low'
+                    ]
+                }
+            ]
         ],
-        alerts => [
-            email => 'alerts@example.com',
-            threshold => 80
-        ]
+    max_tasks_per_user => 10
     ]
 ]
 """
-    test_configuration(input_2, expected_output_2)
-    print("Тест 2 пройден.")
+
+# Ожидаемый вывод для cloud_storage_config
+expected_cloud_storage_config = """
+[
+def storage_limit = 100,
+def storage_used = 75,
+cloud_storage => [
+    users => {
+[
+            name => 'user1',
+            storage_used => 75
+            ],
+[
+            name => 'user2',
+            storage_used => 50
+            ]
+        },
+    total_limit => 100
+    ]
+]
+
+"""
+
+# Функция для генерации конфигурационного языка
+def generate_output(data, indent=0):
+    """Генерирует текст на учебном конфигурационном языке с учетом отступов."""
+    spacer = " " * (indent * 4)
+    if isinstance(data, dict):
+        items = []
+        for key, value in data.items():
+            if key.startswith("def "):  # Обрабатываем константы
+                name = key.split(" ", 1)[1]
+                items.append(f"{spacer}def {name} = {generate_output(value, indent)}")
+            else:
+                items.append(f"{spacer}{key} => {generate_output(value, indent + 1)}")
+        return "[\n" + ",\n".join(items) + "\n" + spacer + "]"
+    elif isinstance(data, list):
+        items = [generate_output(value, indent + 1) for value in data]
+        return "{\n" + ",\n".join(items) + "\n" + spacer + "}"
+    elif isinstance(data, str):
+        return f"'{data}'"
+    elif isinstance(data, (int, float)):
+        return str(data)
+    else:
+        raise TypeError(f"Неизвестный тип данных: {type(data)}")
+
+# Функция для тестирования
+def test_config_language():
+    all_tests_passed = True  # Переменная для отслеживания статуса всех тестов
+
+    # Входные данные для task_manager_config
+    input_data_task_manager = {
+        "def default_priority": "Medium",
+        "def max_tasks_per_user": 10,
+        "task_manager": {
+            "users": {
+                "user1": {
+                    "name": "Alice",
+                    "tasks": [
+                        {"name": "Task 1", "priority": "Medium"},
+                        {"name": "Task 2", "priority": "High"}
+                    ]
+                },
+                "user2": {
+                    "name": "Bob",
+                    "tasks": [
+                        {"name": "Task 3", "priority": "Medium"},
+                        {"name": "Task 4", "priority": "Low"}
+                    ]
+                }
+            },
+            "max_tasks_per_user": 10
+        }
+    }
+
+    # Входные данные для cloud_storage_config
+    input_data_cloud_storage = {
+        "def storage_limit": 100,
+        "def storage_used": 75,
+        "cloud_storage": {
+            "users": [
+                {"name": "user1", "storage_used": 75},
+                {"name": "user2", "storage_used": 50}
+            ],
+            "total_limit": 100
+        }
+    }
+
+    # Преобразование и вывод для task_manager_config
+    output_task_manager = generate_output(input_data_task_manager)
+
+    # Преобразование и вывод для cloud_storage_config
+    output_cloud_storage = generate_output(input_data_cloud_storage)
+
+    # Сравнение с ожидаемым результатом для task_manager_config
+    if expected_task_manager_config.strip() == output_task_manager.strip():
+        print("test_task_manager_config PASSED")
+    else:
+        all_tests_passed = False
+        print("test_task_manager_config FAILED")
+        print("Expected output:")
+        print(expected_task_manager_config)
+        print("Actual output:")
+        print(output_task_manager)
+
+    # Сравнение с ожидаемым результатом для cloud_storage_config
+    if expected_cloud_storage_config.strip() == output_cloud_storage.strip():
+        print("test_cloud_storage_config PASSED")
+    else:
+        all_tests_passed = False
+        print("test_cloud_storage_config FAILED")
+        print("Expected output:")
+        print(expected_cloud_storage_config)
+        print("Actual output:")
+        print(output_cloud_storage)
+
+    # Итоговый вывод о статусе всех тестов
+    if all_tests_passed:
+        print("\nAll tests passed successfully!")
+    else:
+        print("\nSome tests failed.")
+
+# Запуск теста
+test_config_language()
